@@ -41,6 +41,7 @@ function parseOrderResults(scraped) {
 		url:null,
 		screenshot:null,
 		pdf:null,
+		calendarTitle:null,
 		// strings: {} 
 	}
 	let strings = {
@@ -75,10 +76,12 @@ function parseOrderResults(scraped) {
 	from = moment(strings.date +" "+ strings.from, "dddd DD MMM. YYYY HH:mm")
 	to = moment(strings.date +" "+ strings.to, "dddd DD MMM. YYYY HH:mm")
 	
-	details.label = from.format('dddd D MMMM (HH:mm - ') + to.format('HH:mm)')
+	details.label = from.format('dddd D MMMM (H:mm - ') + to.format('H:mm)')
 	details.date = from.format('YYYY-MM-DD')
-	details.from = from.toISOString(true)
-	details.to = to.toISOString(true)
+	details.dateFrom = from.toISOString(true)
+	details.dateTo = to.toISOString(true)
+	details.from = from.format('H:mm')
+	details.to = to.format('H:mm')
 	details.range = from.isValid() && to.isValid() ? to.diff(from,'minutes') : null
 
 	// store the details
@@ -91,6 +94,7 @@ function parseOrderResults(scraped) {
 	// optional elements
 	details.pdf = CONFIG.orderpdf ? CONFIG.orderpdf.split("/").pop() : null
 	details.screenshot = CONFIG.screenshot ? CONFIG.screenshot.split("/").pop() : null
+	details.calendarTitle = CONFIG.calendarTitle || null
 	
 	return details
 }
