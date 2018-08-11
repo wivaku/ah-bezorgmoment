@@ -33,7 +33,8 @@ const fs = require('fs');
  */
 function parseOrderResults(scraped) {
 	let details = { 
-		from:null, to:null, range:null, 
+		label:null,
+		date:null, from:null, to:null, range:null, 
 		changeUntil:null, 
 		timestamp:null,
 		address:null, 
@@ -74,6 +75,8 @@ function parseOrderResults(scraped) {
 	from = moment(strings.date +" "+ strings.from, "dddd DD MMM. YYYY HH:mm")
 	to = moment(strings.date +" "+ strings.to, "dddd DD MMM. YYYY HH:mm")
 	
+	details.label = from.format('dddd D MMMM (HH:mm - ') + to.format('HH:mm)')
+	details.date = from.format('YYYY-MM-DD')
 	details.from = from.toISOString(true)
 	details.to = to.toISOString(true)
 	details.range = from.isValid() && to.isValid() ? to.diff(from,'minutes') : null
@@ -91,6 +94,7 @@ function parseOrderResults(scraped) {
 	
 	return details
 }
+
 
 /**
  * Use Puppeteer (headless Chrome) to mimic regular browser logging in + checking order details
