@@ -35,6 +35,7 @@ function parseOrderResults(scraped) {
 	let details = { 
 		label:null,
 		date:null, from:null, to:null, range:null, 
+		dateFrom:null, dateTo:null,
 		changeUntil:null, 
 		timestamp:null,
 		address:null, 
