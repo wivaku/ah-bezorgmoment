@@ -3,7 +3,14 @@
 // run the Node application to retrieve the details (stored in orderDetails.json)
 exec("cd node && node ahbezorgmoment.js 2>&1", $out, $err);
 
-if ($err) return 'error';
+if ($err) {
+	if (php_sapi_name() !== "cli") {
+		echo '<pre>'. $err;
+	} else {
+		print_r($err);
+	}
+	return;
+}
 
 /* option 1: read from the Node output */
 
