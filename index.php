@@ -1,7 +1,7 @@
 <?php
 
 // run the Node application to retrieve the details (stored in orderDetails.json)
-exec("cd node && node ahbezorgmoment.js 2>&1", $out, $err);
+exec("cd node && /usr/local/bin/node ./ahbezorgmoment.js 2>&1", $out, $err);
 
 if ($err) {
 	if (php_sapi_name() !== "cli") {
