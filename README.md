@@ -3,12 +3,12 @@
 Loads delivery information for Dutch grocery store Albert Heijn and makes available machine-readable details.
 
 Consists of:
-- `node/ahbezorgmoment.js`: the main Node application
+- `node/ah-bezorgmoment.js`: the main Node application
 - `index.php`: the optional PHP wrapper that calls the main application
 
 ## Example
 ```
-$ node node/ahbezorgmoment.js
+$ node node/ah-bezorgmoment.js
 
 { from: '2018-08-18T16:00:00.000+02:00',
   to: '2018-08-18T18:00:00.000+02:00',
