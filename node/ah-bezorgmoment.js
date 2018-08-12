@@ -22,7 +22,42 @@ const URLORDERDETAILS = '/producten/eerder-gekocht/bestelling/print?orderno='
 /** load the modules */
 const puppeteer = require('puppeteer'); // https://github.com/GoogleChrome/puppeteer
 const moment = require('moment'); // https://momentjs.com
-const fs = require('fs');
+const fs = require('fs'); // so we can save the JSON details
+const path = require('path'); // path + filename utilities
+
+// get the parameters
+CONFIG.argv = require('minimist')(process.argv.slice(2));
+
+// we can either set debug flag as parameter or in config.js
+if (!CONFIG.debug && CONFIG.argv.debug) CONFIG.debug = true
+
+// set the name of this file
+CONFIG.filenameApp = path.posix.basename( process.argv[1] );
+// set the path to the app, output folder and if applicable output URL
+CONFIG.pathToApp = path.posix.dirname( process.argv[1] );
+CONFIG.outputPath = path.join( 
+	CONFIG.pathToApp,
+	CONFIG.outputPathRelative,
+	CONFIG.outputFolder
+)
+CONFIG.outputUrl = CONFIG.argv.serverUrl ? path.join(CONFIG.argv.serverUrl,CONFIG.outputFolder) : null
+CONFIG.executionStart = moment()
+
+const syntax = `syntax:
+node ${CONFIG.filenameApp} [--withPdf] [--serverUrl=<url>] [--debug] [--help]
+  --withPdf         : also create PDF (takes a bit longer)
+  --serverUrl=<url> : store serverUrl in output urls
+  --debug           : enable debugging (e.g. display browser)
+  --help            : this message 
+`
+
+if(CONFIG.argv.help) {
+	console.log(syntax)
+	if (CONFIG.debug) console.log(CONFIG)
+	return
+}
+
+
 
 /**
  * Parse the strings from the website and create object with relevant delivery and change details
@@ -33,23 +68,28 @@ const fs = require('fs');
  */
 function parseOrderResults(scraped) {
 	let details = { 
-		label:null,
-		date:null, from:null, to:null, range:null, 
+		label:null, labelHuman:null, labelHumanUntil:null, labelHumanChange:null,
+		date:null, from:null, to:null, range:null,
+		weekday:null, dayAndMonth:null,
 		dateFrom:null, dateTo:null,
 		changeUntil:null, 
 		timestamp:null,
 		address:null, 
 		url:null,
+		json:null,
 		screenshot:null,
 		pdf:null,
 		calendarTitle:null,
+		labelPrevious:null, rangePrevious:null, 
+		minutesFromPrevious:null, minutesToPrevious:null,
+		timestampPrevious:null, previous:null,
 		// strings: {} 
 	}
 	let strings = {
 		date:null, from: null, to:null, changeUntil:null
 	}
-	
-	// deliveryDetails
+
+	// parse deliveryDetails string
 	regex = /(.*20\d\d).(\d{2}:\d{2}) - (\d{2}:\d{2}), (.*)/gm;
 	// 'Zaterdag 18 aug. 2018 16:00 - 18:00, My street 1234, City'
 	m = regex.exec(scraped.deliveryDetails)
@@ -60,8 +100,16 @@ function parseOrderResults(scraped) {
 		strings.to = m[3]
 		details.address = m[4]
 	}
-	
-	// changeDetails
+
+	// during debug, replace actual data with dummy data
+	if (CONFIG.debug) {
+		const dummyAddress = 'My address 1234, My city'
+		scraped.deliveryDetails = scraped.deliveryDetails.replace(details.address,dummyAddress)		
+		details.address = dummyAddress
+		scraped.orderUrl = scraped.orderUrl.replace(/\d+/gm, '123456789')
+	}
+
+	// parse changeDetails string
 	regex = /Nog te wijzigen tot (.*?), (.*)/gm;
 	// 'Nog te wijzigen tot vrijdag, 17 augustus 2018, 23:59'
 	m = regex.exec(scraped.changeDetails)
@@ -76,15 +124,22 @@ function parseOrderResults(scraped) {
 	moment.locale('nl')
 	from = moment(strings.date +" "+ strings.from, "dddd DD MMM. YYYY HH:mm")
 	to = moment(strings.date +" "+ strings.to, "dddd DD MMM. YYYY HH:mm")
+	now = moment()
 	
+	// http://momentjs.com/docs/#/displaying/format/
 	details.label = from.format('dddd D MMMM (H:mm - ') + to.format('H:mm)')
+	details.labelHuman = from.format('dddd [tussen] H:mm [en] ') + to.format('H:mm')
+	details.labelHumanUntil = now.to(to)
+	details.labelHumanChange = now.to(changeUntil)
 	details.date = from.format('YYYY-MM-DD')
 	details.dateFrom = from.toISOString(true)
 	details.dateTo = to.toISOString(true)
 	details.from = from.format('H:mm')
 	details.to = to.format('H:mm')
 	details.range = from.isValid() && to.isValid() ? to.diff(from,'minutes') : null
-
+	details.weekday = from.format('dddd')
+	details.dayAndMonth = from.format('D MMMM')
+	
 	// store the details
 	details.source = {deliveryDetails:scraped.deliveryDetails, changeDetails:scraped.changeDetails}
 	// details.url = `${URLBASE}${URLORDERS}`
@@ -92,11 +147,35 @@ function parseOrderResults(scraped) {
 	details.strings = strings
 	details.timestamp = moment().toISOString(true)
 
-	// optional elements
-	details.pdf = CONFIG.orderpdf ? CONFIG.orderpdf.split("/").pop() : null
-	details.screenshot = CONFIG.screenshot ? CONFIG.screenshot.split("/").pop() : null
 	details.calendarTitle = CONFIG.calendarTitle || null
+	details.json = CONFIG.detailsJson || null
+	details.screenshot = CONFIG.screenshot || null
+	details.pdf = CONFIG.argv.withPdf ? CONFIG.orderPdf || null : null
+	// if server URL was provided, then prefix the output URL
+	if (CONFIG.outputUrl) {
+		if (details.json) details.json = CONFIG.outputUrl +'/'+ details.json
+		if (details.screenshot) details.screenshot = CONFIG.outputUrl +'/'+ details.screenshot
+		if (details.pdf) details.pdf = CONFIG.outputUrl +'/'+ details.pdf
+	}
 	
+	// compare with previous details
+	if (scraped.previousDetails) {
+		const prevDetails = scraped.previousDetails
+		if (CONFIG.debug) {
+			prevDetails.dateFrom = moment(prevDetails.dateFrom).subtract(2,'hours').toISOString(true);
+			prevDetails.dateTo = moment(prevDetails.dateTo).add(1,'hours').toISOString(true);
+		}
+		prevFrom = moment(prevDetails.dateFrom)
+		prevTo = moment(prevDetails.dateTo)
+
+		details.timestampPrevious = prevDetails.timestamp
+		details.previous = moment(prevDetails.timestamp).from(moment())
+		details.labelPrevious = prevDetails.label
+		details.rangePrevious = prevDetails.range
+		details.minutesFromPrevious = from.diff(prevFrom, 'minutes')
+		details.minutesToPrevious = to.diff(prevTo, 'minutes')
+	}
+
 	return details
 }
 
@@ -111,6 +190,12 @@ function parseOrderResults(scraped) {
 		console.error('check/create creds.js: should contain "username" and "password"')
 		return
 	}
+
+	// read the previous details
+	const previousJson = CONFIG.detailsJson ? fs.readFileSync(
+		path.join(CONFIG.outputPath, CONFIG.detailsJson), { encoding: 'utf-8' }
+	) : null;
+	const previousDetails = previousJson ? JSON.parse(previousJson) : null
 
 	let launchSettings = {
 		// executablePath: '/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome', // your mileage may vary
@@ -138,7 +223,7 @@ function parseOrderResults(scraped) {
 
 	// store as screenshot
 	if (CONFIG.screenshot) {
-		await page.screenshot({path: CONFIG.screenshot, fullPage: false});
+		await page.screenshot({path: path.join(CONFIG.outputPath, CONFIG.screenshot), fullPage: false});
 	}
 
 	// check if the login failed: get the error message on the screen
@@ -161,24 +246,38 @@ function parseOrderResults(scraped) {
 			orderUrl: await page.$eval(`article div a[href*="${URLORDERS}"]`, el => el.href),
 		}
 		scraped.orderNumber = scraped.orderUrl.split("/").pop();
+		if (previousDetails) scraped.previousDetails = previousDetails
 
 		// parse these details
 		const details = parseOrderResults(scraped)
-		if (CONFIG.outputjson) {
-			fs.writeFileSync(CONFIG.outputjson, JSON.stringify(details, null, 2) , 'utf-8'); 
-		}
-		// console.log(details)
-		console.log(JSON.stringify(details))
 
-		// create PDF of the order - will fail if not headless (e.g. devtools)
-		if (CONFIG.orderpdf) {
+		if (CONFIG.detailsJson) {
+			// store how long it took to execute
+			details.executionSeconds = moment().diff(CONFIG.executionStart, 'seconds', true)
+
+			fs.writeFileSync(
+				path.join(CONFIG.outputPath, CONFIG.detailsJson), 
+				JSON.stringify(details, null, 2),
+				{ encoding: 'utf-8' }
+			); 
+		}
+		// console.log(details) // pretty print, but difficult for index.php
+		console.log(JSON.stringify(details)) // as a single line
+
+		// create PDF of the order (only if asked for in command line argument)
+		// will fail if not headless (e.g. devtools)
+		if (CONFIG.argv.withPdf && CONFIG.orderPdf) {
 			const pagePdf = await browser.newPage();
-			await pagePdf.goto(`${URLBASE}${URLORDERDETAILS}${scraped.orderNumber}`, {waitUntil: 'networkidle0'});
+			await pagePdf.goto(`${URLBASE}${URLORDERDETAILS}${scraped.orderNumber}`, {waitUntil: 'networkidle2'});
 
 			// remove the background color
 			pagePdf.addStyleTag({content:'body { background-color: transparent !important }'})
 
-			if (!CONFIG.debug) await pagePdf.pdf({path: CONFIG.orderpdf, format: 'A4'});
+			// create the PDF file (unless we are in debug mode, only possible headless)
+			if (!CONFIG.debug) await pagePdf.pdf({
+				path: path.join(CONFIG.outputPath, CONFIG.orderPdf), 
+				format: 'A4'
+			});
 		}	  
 	}
 

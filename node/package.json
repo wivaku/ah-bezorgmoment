@@ -2,13 +2,14 @@
   "name": "node",
   "version": "1.0.0",
   "description": "",
-  "main": "ahbezorgmoment.js",
+  "main": "ah-bezorgmoment.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "minimist": "^1.2.0",
     "moment": "^2.22.2",
     "puppeteer": "^1.7.0"
   }

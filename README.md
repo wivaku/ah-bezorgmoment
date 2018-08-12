@@ -1,6 +1,14 @@
 # Albert Heijn delivery information (bezorgmoment)
 
-Loads delivery information for Dutch grocery store Albert Heijn and makes available machine-readable details.
+Loads delivery information for Dutch grocery store Albert Heijn and makes available machine-readable details. It stores the details so they can be compared with previous retrievals.
+
+Example usage: create Siri Shortcut (iOS 12) that reads the delivery data.
+And then e.g.:
+- [let Siri say what the delivery time will be](https://github.com/wivaku/ah-bezorgmoment/issues/1)
+- add / update the calendar entry
+- view the ordered items as PDF
+
+https://user-images.githubusercontent.com/2084872/44001837-85fcf020-9e39-11e8-94ce-58eee2b7c344.jpeg
 
 Consists of:
 - `node/ah-bezorgmoment.js`: the main Node application
@@ -8,27 +16,48 @@ Consists of:
 
 ## Example
 ```
-$ node node/ah-bezorgmoment.js
-
-{ from: '2018-08-18T16:00:00.000+02:00',
-  to: '2018-08-18T18:00:00.000+02:00',
+$ ./ah-bezorgmoment.js --withPdf --serverUrl=https://example.com/ah-bezorgmoment
+```
+Returns:
+```
+{ label: 'zaterdag 18 augustus (16:00 - 18:00)',
+  labelHuman: 'zaterdag tussen 16:00 en 18:00',
+  labelHumanUntil: 'over 6 dagen',
+  labelHumanChange: 'over 5 dagen',
+  date: '2018-08-18',
+  from: '16:00',
+  to: '18:00',
   range: 120,
+  weekday: 'zaterdag',
+  dayAndMonth: '18 augustus',
+  dateFrom: '2018-08-18T16:00:00.000+02:00',
+  dateTo: '2018-08-18T18:00:00.000+02:00',
   changeUntil: '2018-08-17T23:59:00.000+02:00',
-  timestamp: '2018-08-11T19:48:23.672+02:00',
-  address: 'My address 123, My city',
+  timestamp: '2018-08-12T13:44:01.342+02:00',
+  address: 'My address 1234, My city',
   url:
    'https://www.ah.nl/producten/eerder-gekocht/bestellingen/123456789',
+  json:
+   'https:/example.com/ah-bezorgmoment/output/orderDetails.json',
+  screenshot: 'https:/example.com/ah-bezorgmoment/output/screenshot.png',
+  pdf: 'https:/example.com/ah-bezorgmoment/output/bestelling.pdf',
+  calendarTitle: 'Albert Heijn bezorgmoment',
+  labelPrevious: 'zaterdag 18 augustus (14:00 - 19:00)',
+  rangePrevious: 300,
+  minutesFromPrevious: 120,
+  minutesToPrevious: -60,
+  timestampPrevious: '2018-08-12T13:32:57.041+02:00',
+  previous: '11 minuten geleden',
   source:
    { deliveryDetails:
-      'Zaterdag 18 aug. 2018 16:00 - 18:00, My address 123, My city',
+      'Zaterdag 18 aug. 2018 16:00 - 18:00, My address 1234, My city',
      changeDetails: 'Nog te wijzigen tot vrijdag, 17 augustus 2018, 23:59' },
   strings:
    { date: 'Zaterdag 18 aug. 2018',
      from: '16:00',
      to: '18:00',
      changeUntil: '17 augustus 2018, 23:59' },
-  pdf: 'bestelling.pdf',
-  screenshot: 'screenshot.png' }
+  executionSeconds: 3.84 }
   ```
 
 ### output
@@ -36,7 +65,20 @@ $ node node/ah-bezorgmoment.js
 The following optional output files can be created (see config section).
 - **JSON**: the delivery details as JSON (see example above)
 - **screenshot**: the delivery details as PNG image
-- **items**: the order items as PDF
+- **order items**: the order items as PDF
+
+### parameters
+
+```
+$ node ah-bezorgmoment.js --help
+
+syntax:
+node ah-bezorgmoment.js [--withPdf] [--serverUrl=<url>] [--debug] [--help]
+  --withPdf         : also create PDF (takes a bit longer)
+  --serverUrl=<url> : store serverUrl in output urls
+  --debug           : enable debugging (e.g. display browser)
+  --help            : this message
+```
 
 ### PHP wrapper
 
@@ -46,6 +88,7 @@ A PHP wrapper is provided (`index.php`), which internally calls the Node applica
 php -S localhost:8000
 open http://localhost:8000
 ```
+
 
 ## Installing
 
@@ -62,7 +105,7 @@ git clone git@github.com:wivaku/ah-bezorgmoment.git
 
 ### Node modules
 
-Install Node modules ([puppeteer](https://github.com/GoogleChrome/puppeteer) and [moment](https://momentjs.com/)). 
+Install Node modules, mainly ([puppeteer](https://github.com/GoogleChrome/puppeteer) and [moment](https://momentjs.com/)). 
 
 ```
 cd node
@@ -73,15 +116,11 @@ npm install
 
 ### Credentials
 
-Copy `node/creds_example.js` to `node/creds.js` and enter your Albert Heijn login details.
+**required**: Copy `node/creds_example.js` to `node/creds.js` and enter your Albert Heijn login details.
 
 ### Config
 
 See `node/config.js` to enable / disable or customize location and filename. 
-
-### Debugging
-
-Set `debug: true` in `node/config.js` to show the browser (default: headless)
 
 ## Author
 
