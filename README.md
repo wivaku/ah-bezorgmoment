@@ -8,8 +8,6 @@ And then e.g.:
 - add / update the calendar entry
 - view the ordered items as PDF
 
-https://user-images.githubusercontent.com/2084872/44001837-85fcf020-9e39-11e8-94ce-58eee2b7c344.jpeg
-
 Consists of:
 - `node/ah-bezorgmoment.js`: the main Node application
 - `index.php`: the optional PHP wrapper that calls the main application
