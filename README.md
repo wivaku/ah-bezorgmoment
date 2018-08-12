@@ -1,6 +1,6 @@
 # Albert Heijn delivery information (bezorgmoment)
 
-Loads delivery information for Dutch grocery store [Albert Heijn](https://www.ah.nl/over-ah/online-bestellen/bezorgservice) and makes available machine-readable details. It stores the details so they can be compared with previous retrievals.
+Loads delivery information of your next delivery from Dutch grocery store [Albert Heijn](https://www.ah.nl/over-ah/online-bestellen/bezorgservice) and makes available machine-readable details. It stores the details so they can be compared with previous retrievals.
 
 Example usage: create Siri Shortcut (iOS 12) that reads the delivery data.
 And then e.g.:
