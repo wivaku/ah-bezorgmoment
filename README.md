@@ -10,7 +10,7 @@ And then e.g.:
 
 Consists of:
 - `node/ah-bezorgmoment.js`: the main Node application
-- `index.php`: the optional PHP wrapper that calls the main application
+- `index.php`: the optional PHP wrapper that calls the main Node application
 
 ## Example
 ```
