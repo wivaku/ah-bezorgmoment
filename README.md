@@ -129,4 +129,4 @@ Winfred van Kuijk
 This project is licensed under the [MIT License](LICENSE).
 
 This project is not associated with or endorsed by Albert Heijn. 
-It does not use any API's or scraping, it simply mimicks the user using a webbrowser checking the order delivery information.
+It does not use any API's or scraping, it simply mimics the user using a webbrowser checking the order delivery information.
