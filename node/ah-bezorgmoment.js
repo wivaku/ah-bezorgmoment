@@ -179,7 +179,7 @@ function parseOrderResults(scraped) {
 		if (details.minutesFromPrevious) {
 			minutesChangedFrom = from.from(prevFrom, true)
 			details.humanFromPrevious = minutesChangedFrom
-			details.humanFromPrevious += minutesChangedFrom < 0 ? " eerder" : " later"
+			details.humanFromPrevious += minutesChangedFrom > 0 ? " eerder" : " later"
 		}
 
 	}
