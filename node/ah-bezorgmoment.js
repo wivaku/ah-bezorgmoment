@@ -82,7 +82,8 @@ function parseOrderResults(scraped) {
 		calendarTitle:null,
 		labelPrevious:null, rangePrevious:null, 
 		minutesFromPrevious:null, minutesToPrevious:null,
-		timestampPrevious:null, previous:null,
+		humanFromPrevious:null,
+		timestampPrevious:null, humanPrevious:null,
 		// strings: {} 
 	}
 	let strings = {
@@ -169,11 +170,18 @@ function parseOrderResults(scraped) {
 		prevTo = moment(prevDetails.dateTo)
 
 		details.timestampPrevious = prevDetails.timestamp
-		details.previous = moment(prevDetails.timestamp).from(moment())
+		details.humanPrevious = moment(prevDetails.timestamp).from(moment())
 		details.labelPrevious = prevDetails.label
 		details.rangePrevious = prevDetails.range
 		details.minutesFromPrevious = from.diff(prevFrom, 'minutes')
 		details.minutesToPrevious = to.diff(prevTo, 'minutes')
+
+		if (details.minutesFromPrevious) {
+			minutesChangedFrom = from.from(prevFrom, true)
+			details.humanFromPrevious = minutesChangedFrom
+			details.humanFromPrevious += minutesChangedFrom < 0 ? " eerder" : " later"
+		}
+
 	}
 
 	return details
