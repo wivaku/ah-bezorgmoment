@@ -20,6 +20,5 @@ module.exports = {
 	orderPdf: 'bestelling.pdf',
 
 	// the default calendar title (helps to find existing calendar events)
-	calendarTitle: 'Albert Heijn bezorgmoment',
-	
+	calendarTitle: 'Albert Heijn bezorgmoment',	
 }

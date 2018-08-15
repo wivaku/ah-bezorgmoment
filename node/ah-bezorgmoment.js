@@ -44,11 +44,12 @@ CONFIG.outputUrl = CONFIG.argv.serverUrl ? path.join(CONFIG.argv.serverUrl,CONFI
 CONFIG.executionStart = moment()
 
 const syntax = `syntax:
-node ${CONFIG.filenameApp} [--withPdf] [--serverUrl=<url>] [--debug] [--help]
-  --withPdf         : also create PDF (takes a bit longer)
-  --serverUrl=<url> : store serverUrl in output urls
-  --debug           : enable debugging (e.g. display browser)
-  --help            : this message 
+node ${CONFIG.filenameApp} [--withPdf] [--serverUrl=<url>] [--cached] [--debug] [--help]
+	--withPdf         : also create PDF (takes a bit longer)
+	--serverUrl=<url> : store serverUrl in output urls
+	--cached          : return the cached JSON data
+	--debug           : enable debugging (e.g. display browser)
+	--help            : this message 
 `
 
 if(CONFIG.argv.help) {
@@ -56,7 +57,6 @@ if(CONFIG.argv.help) {
 	if (CONFIG.debug) console.log(CONFIG)
 	return
 }
-
 
 
 /**
@@ -67,23 +67,23 @@ if(CONFIG.argv.help) {
  * 
  */
 function parseOrderResults(scraped) {
+	// e.g. iOS Shortcuts Dictionary can not handle nested object, so make as flat as possible
 	let details = { 
-		label:null, labelHuman:null, labelHumanUntil:null, labelHumanChange:null,
-		date:null, from:null, to:null, range:null,
-		weekday:null, dayAndMonth:null,
-		dateFrom:null, dateTo:null,
-		changeUntil:null, 
+		label:null, label_human:null, label_humanUntilDelivery:null, label_humanChangeUntil:null,
+		date_ymd:null, time_from:null, time_to:null, minutesBetweenFromTo:null,
+		label_weekday:null, label_dayAndMonth:null,
+		date_dateFrom:null, date_dateTo:null, date_dateChangeUntil:null, 
 		timestamp:null,
 		address:null, 
-		url:null,
+		orderUrl:null,
 		json:null,
 		screenshot:null,
 		pdf:null,
 		calendarTitle:null,
-		labelPrevious:null, rangePrevious:null, 
-		minutesFromPrevious:null, minutesToPrevious:null,
-		humanFromPrevious:null,
-		timestampPrevious:null, humanPrevious:null,
+		previous_label:null, previous_minutesBetweenFromTo:null, 
+		previous_deltaMinutesFrom:null, previous_deltaMinutesTo:null,
+		previous_deltaHuman:null,
+		previous_timestamp:null, previous_humanHowLongAgo:null,
 		// strings: {} 
 	}
 	let strings = {
@@ -118,7 +118,7 @@ function parseOrderResults(scraped) {
 	if(m && m[2]) {
 		strings.changeUntil = m[2]
 		changeUntil = moment(strings.changeUntil, "DD MMMM YYYY, HH:mm")
-		details.changeUntil = changeUntil.toISOString(true)
+		details.date_dateChangeUntil = changeUntil.toISOString(true)
 	}
 	
 	// parse the various strings
@@ -129,29 +129,29 @@ function parseOrderResults(scraped) {
 	
 	// http://momentjs.com/docs/#/displaying/format/
 	details.label = from.format('dddd D MMMM (H:mm - ') + to.format('H:mm)')
-	details.labelHuman = from.format('dddd [tussen] H:mm [en] ') + to.format('H:mm')
-	details.labelHumanUntil = now.to(to)
-	details.labelHumanChange = now.to(changeUntil)
-	details.date = from.format('YYYY-MM-DD')
-	details.dateFrom = from.toISOString(true)
-	details.dateTo = to.toISOString(true)
-	details.from = from.format('H:mm')
-	details.to = to.format('H:mm')
-	details.range = from.isValid() && to.isValid() ? to.diff(from,'minutes') : null
-	details.weekday = from.format('dddd')
-	details.dayAndMonth = from.format('D MMMM')
+	details.label_human = from.format('dddd [tussen] H:mm [en] ') + to.format('H:mm')
+	details.label_humanUntilDelivery = now.to(to)
+	details.label_humanChangeUntil = now.to(changeUntil)	
+	details.date_dateFrom = from.toISOString(true)
+	details.date_dateTo = to.toISOString(true)
+	details.date_ymd = from.format('YYYY-MM-DD')
+	details.time_from = from.format('H:mm')
+	details.time_to = to.format('H:mm')
+	details.minutesBetweenFromTo = from.isValid() && to.isValid() ? to.diff(from,'minutes') : null
+	details.label_weekday = from.format('dddd')
+	details.label_dayAndMonth = from.format('D MMMM')
 	
-	// store the details
-	details.source = {deliveryDetails:scraped.deliveryDetails, changeDetails:scraped.changeDetails}
-	// details.url = `${URLBASE}${URLORDERS}`
-	details.url = scraped.orderUrl
-	details.strings = strings
+	// store the remaining details
 	details.timestamp = moment().toISOString(true)
+	details.source = {deliveryDetails:scraped.deliveryDetails, changeDetails:scraped.changeDetails}
+	details.strings = strings
 
+	details.orderUrl = scraped.orderUrl
 	details.calendarTitle = CONFIG.calendarTitle || null
 	details.json = CONFIG.detailsJson || null
 	details.screenshot = CONFIG.screenshot || null
 	details.pdf = CONFIG.argv.withPdf ? CONFIG.orderPdf || null : null
+	
 	// if server URL was provided, then prefix the output URL
 	if (CONFIG.outputUrl) {
 		if (details.json) details.json = CONFIG.outputUrl +'/'+ details.json
@@ -163,25 +163,26 @@ function parseOrderResults(scraped) {
 	if (scraped.previousDetails) {
 		const prevDetails = scraped.previousDetails
 		if (CONFIG.debug) {
-			prevDetails.dateFrom = moment(prevDetails.dateFrom).subtract(2,'hours').toISOString(true);
-			prevDetails.dateTo = moment(prevDetails.dateTo).add(1,'hours').toISOString(true);
+			prevDetails.date_dateFrom = moment(prevDetails.date_dateFrom).subtract(2,'hours').toISOString(true);
+			prevDetails.date_dateTo = moment(prevDetails.date_dateTo).add(1,'hours').toISOString(true);
 		}
-		prevFrom = moment(prevDetails.dateFrom)
-		prevTo = moment(prevDetails.dateTo)
+		prevFrom = moment(prevDetails.date_dateFrom)
+		prevTo = moment(prevDetails.date_dateTo)
 
-		details.timestampPrevious = prevDetails.timestamp
-		details.humanPrevious = moment(prevDetails.timestamp).from(moment())
-		details.labelPrevious = prevDetails.label
-		details.rangePrevious = prevDetails.range
-		details.minutesFromPrevious = from.diff(prevFrom, 'minutes')
-		details.minutesToPrevious = to.diff(prevTo, 'minutes')
+		details.previous_timestamp = prevDetails.timestamp
+		details.previous_label = prevDetails.label
+		details.previous_humanHowLongAgo = moment(prevDetails.timestamp).from(moment())
+		details.previous_minutesBetweenFromTo = prevDetails.minutesBetweenFromTo
+		details.previous_deltaMinutesFrom = from.diff(prevFrom, 'minutes')
+		details.previous_deltaMinutesTo = to.diff(prevTo, 'minutes')
 
-		if (details.minutesFromPrevious) {
+		if (details.previous_deltaMinutesFrom) {
 			minutesChangedFrom = from.from(prevFrom, true)
-			details.humanFromPrevious = minutesChangedFrom
-			details.humanFromPrevious += minutesChangedFrom > 0 ? " eerder" : " later"
+			details.previous_deltaHuman = minutesChangedFrom
+			details.previous_deltaHuman += minutesChangedFrom > 0 ? " eerder" : " later"
+		} else {
+			details.previous_deltaHuman = 'ongewijzigd'
 		}
-
 	}
 
 	return details
@@ -205,6 +206,13 @@ function parseOrderResults(scraped) {
 	) : null;
 	const previousDetails = previousJson ? JSON.parse(previousJson) : null
 
+	// if cached data was requested: display it and exit
+	if (CONFIG.argv.cached && previousDetails) {
+		console.log(JSON.stringify(previousDetails,null,2))
+		return
+	}	
+
+	// optional settings for Puppeteer
 	let launchSettings = {
 		// executablePath: '/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome', // your mileage may vary
 		// args: [ '--disable-extensions' ],
@@ -269,8 +277,8 @@ function parseOrderResults(scraped) {
 				{ encoding: 'utf-8' }
 			); 
 		}
-		// console.log(details) // pretty print, but difficult for index.php
-		console.log(JSON.stringify(details)) // as a single line
+		// display the details object
+		console.log(JSON.stringify(details,null,2))
 
 		// create PDF of the order (only if asked for in command line argument)
 		// will fail if not headless (e.g. devtools)
