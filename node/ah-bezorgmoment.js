@@ -61,7 +61,7 @@ if(CONFIG.argv.help) {
 
 /**
  * Parse the strings from the website and create object with relevant delivery and change details
- * @param {object} scraped The scraped details: {deliveryDetails, changeDetails, orderUrl, orderNumber}
+ * @param {object} scraped The scraped details: {deliverySummary, deliveryDetails, orderUrl, orderNumber}
  * 
  * @returns {object} details The order details
  * 
@@ -90,10 +90,10 @@ function parseOrderResults(scraped) {
 		date:null, from: null, to:null, changeUntil:null
 	}
 
-	// parse deliveryDetails string
+	// parse deliverySummary string
 	regex = /(.*20\d\d).(\d{2}:\d{2}) - (\d{2}:\d{2}), (.*)/gm;
 	// 'Zaterdag 18 aug. 2018 16:00 - 18:00, My street 1234, City'
-	m = regex.exec(scraped.deliveryDetails)
+	m = regex.exec(scraped.deliverySummary)
 	
 	if (m && m[1]) {
 		strings.date = m[1]
@@ -105,22 +105,38 @@ function parseOrderResults(scraped) {
 	// during debug, replace actual data with dummy data
 	if (CONFIG.debug) {
 		const dummyAddress = 'My address 1234, My city'
-		scraped.deliveryDetails = scraped.deliveryDetails.replace(details.address,dummyAddress)		
+		scraped.deliverySummary = scraped.deliverySummary.replace(details.address,dummyAddress)		
 		details.address = dummyAddress
 		scraped.orderUrl = scraped.orderUrl.replace(/\d+/gm, '123456789')
 	}
 
-	// parse changeDetails string
-	regex = /Nog te wijzigen tot (.*?), (.*)/gm;
+	// parse details string, can be 
+	// 1) change details
+	// 2) updated delivery details
+
 	// 'Nog te wijzigen tot vrijdag, 17 augustus 2018, 23:59'
-	m = regex.exec(scraped.changeDetails)
+	regex = /Nog te wijzigen tot (.*?), (.*)/gm;
+	m = regex.exec(scraped.deliveryDetails)
 	
 	if(m && m[2]) {
 		strings.changeUntil = m[2]
 		changeUntil = moment(strings.changeUntil, "DD MMMM YYYY, HH:mm")
+
 		details.date_dateChangeUntil = changeUntil.toISOString(true)
+		details.label_humanChangeUntil = now.to(changeUntil)	
 	}
 	
+	// 'Je bezorging staat gepland tussen 16:15 en 16:45. Deze tijd kan nog wijzigen'
+	regex = /Je bezorging staat gepland tussen (\d+:\d+) en (\d+:\d+).*/gm;
+	m = regex.exec(scraped.deliveryDetails)
+
+	// we now have more precise times
+	if(m && m[2]) {
+		strings.from = m[1]
+		strings.to = m[2]
+	}
+
+
 	// parse the various strings
 	moment.locale('nl')
 	from = moment(strings.date +" "+ strings.from, "dddd DD MMM. YYYY HH:mm")
@@ -131,7 +147,6 @@ function parseOrderResults(scraped) {
 	details.label = from.format('dddd D MMMM (H:mm - ') + to.format('H:mm)')
 	details.label_human = from.format('dddd [tussen] H:mm [en] ') + to.format('H:mm')
 	details.label_humanUntilDelivery = now.to(to)
-	details.label_humanChangeUntil = now.to(changeUntil)	
 	details.date_dateFrom = from.toISOString(true)
 	details.date_dateTo = to.toISOString(true)
 	details.date_ymd = from.format('YYYY-MM-DD')
@@ -143,7 +158,7 @@ function parseOrderResults(scraped) {
 	
 	// store the remaining details
 	details.timestamp = moment().toISOString(true)
-	details.source = {deliveryDetails:scraped.deliveryDetails, changeDetails:scraped.changeDetails}
+	details.source = {deliverySummary:scraped.deliverySummary, deliveryDetails:scraped.deliveryDetails}
 	details.strings = strings
 
 	details.orderUrl = scraped.orderUrl
@@ -257,8 +272,8 @@ function parseOrderResults(scraped) {
 	if (openOrders.length) {
 		// read available details
 		const scraped = {
-			deliveryDetails: await page.$eval('article a h2', el => el.innerText),
-			changeDetails: await page.$eval('article a p', el => el.innerText),
+			deliverySummary: await page.$eval('article a h2', el => el.innerText),
+			deliveryDetails: await page.$eval('article a p', el => el.innerText),
 			orderUrl: await page.$eval(`article div a[href*="${URLORDERS}"]`, el => el.href),
 		}
 		scraped.orderNumber = scraped.orderUrl.split("/").pop();
