@@ -1,12 +1,13 @@
 {
   "name": "node",
   "version": "1.0.0",
-  "description": "",
+  "description": "AH Bezorgmoment npm packages",
+  "repository": "n/a",
   "main": "ah-bezorgmoment.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "preinstall": "mkdir ../output; chmod a+w ../output; ",
-    "postinstall": "[ ! -f config.js ] && cp config_example.js config.js && echo 'created config.js'; [ ! -f creds.js ] && cp creds_example.js creds.js && echo 'created creds.js - enter credentials'; "
+    "preinstall": "[ -d ../output ] || ( mkdir ../output; chmod a+w ../output; ) ",
+    "postinstall": "[ -f config.js ] || (cp config_example.js config.js; echo 'created config.js'); [ -f creds.js ] || (cp creds_example.js creds.js && echo 'created creds.js - enter credentials')"
   },
   "author": "Winfred van Kuijk",
   "license": "ISC",

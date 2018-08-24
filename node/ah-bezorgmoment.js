@@ -110,6 +110,8 @@ function parseOrderResults(scraped) {
 		scraped.orderUrl = scraped.orderUrl.replace(/\d+/gm, '123456789')
 	}
 
+	now = moment()
+
 	// parse details string, can be 
 	// 1) change details
 	// 2) updated delivery details
@@ -141,7 +143,6 @@ function parseOrderResults(scraped) {
 	moment.locale('nl')
 	from = moment(strings.date +" "+ strings.from, "dddd DD MMM. YYYY HH:mm")
 	to = moment(strings.date +" "+ strings.to, "dddd DD MMM. YYYY HH:mm")
-	now = moment()
 	
 	// http://momentjs.com/docs/#/displaying/format/
 	details.label = from.format('dddd D MMMM (H:mm - ') + to.format('H:mm)')
