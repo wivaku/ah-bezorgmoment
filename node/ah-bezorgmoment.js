@@ -176,7 +176,7 @@ function parseOrderResults(scraped) {
 	}
 	
 	// compare with previous details
-	if (scraped.previousDetails) {
+	if (scraped.previousDetails && scraped.previousDetails.orderUrl == details.orderUrl) {
 		const prevDetails = scraped.previousDetails
 		if (CONFIG.debug) {
 			prevDetails.date_dateFrom = moment(prevDetails.date_dateFrom).subtract(2,'hours').toISOString(true);
