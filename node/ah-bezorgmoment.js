@@ -83,7 +83,8 @@ function parseOrderResults(scraped) {
 		calendarTitle:null,
 		// strings: {} 
 	}
-	if (CONFIG.withPrevious) {
+
+	if (CONFIG.argv.withPrevious) {
 		// merge additional details
 		details = Object.assign(details, {
 			previous_label:null, previous_minutesBetweenFromTo:null, 
@@ -92,6 +93,7 @@ function parseOrderResults(scraped) {
 			previous_timestamp:null, previous_humanHowLongAgo:null,
 		})
 	}
+
 	let strings = {
 		date:null, from: null, to:null, changeUntil:null
 	}
@@ -194,7 +196,7 @@ function parseOrderResults(scraped) {
 	}
 	
 	// compare with previous details
-	if (CONFIG.withPrevious && scraped.previousDetails && scraped.previousDetails.orderUrl == details.orderUrl) {
+	if (CONFIG.argv.withPrevious && scraped.previousDetails && scraped.previousDetails.orderUrl == details.orderUrl) {
 		const prevDetails = scraped.previousDetails
 		if (CONFIG.debug) {
 			prevDetails.date_dateFrom = moment(prevDetails.date_dateFrom).subtract(2,'hours').toISOString(true);
@@ -234,19 +236,17 @@ function parseOrderResults(scraped) {
 		return
 	}
 
-	if (CONFIG.withPrevious) {
-		// read the previous details
-		const previousJson = CONFIG.detailsJson ? fs.readFileSync(
-			path.join(CONFIG.outputPath, CONFIG.detailsJson), { encoding: 'utf-8' }
-		) : null;
-		const previousDetails = previousJson ? JSON.parse(previousJson) : null
+	// read the previous details
+	const previousJson = CONFIG.argv.withPrevious && CONFIG.detailsJson ? fs.readFileSync(
+		path.join(CONFIG.outputPath, CONFIG.detailsJson), { encoding: 'utf-8' }
+	) : null;
+	const previousDetails = previousJson ? JSON.parse(previousJson) : null
 
-		// if cached data was requested: display it and exit
-		if (CONFIG.argv.cached && previousDetails) {
-			console.log(JSON.stringify(previousDetails,null,2))
-			return
-		}	
-	}
+	// if cached data was requested: display it and exit
+	if (CONFIG.argv.cached && previousDetails) {
+		console.log(JSON.stringify(previousDetails,null,2))
+		return
+	}	
 
 	// optional settings for Puppeteer
 	let launchSettings = {
@@ -298,7 +298,7 @@ function parseOrderResults(scraped) {
 			orderUrl: await page.$eval(`article div a[href*="${URLORDERS}"]`, el => el.href),
 		}
 		scraped.orderNumber = scraped.orderUrl.split("/").pop();
-		if (CONFIG.withPrevious && previousDetails) scraped.previousDetails = previousDetails
+		if (CONFIG.argv.withPrevious && previousDetails) scraped.previousDetails = previousDetails
 
 		// parse these details
 		const details = parseOrderResults(scraped)
