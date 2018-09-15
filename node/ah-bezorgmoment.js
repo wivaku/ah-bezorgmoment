@@ -44,9 +44,10 @@ CONFIG.outputUrl = CONFIG.argv.serverUrl ? path.join(CONFIG.argv.serverUrl,CONFI
 CONFIG.executionStart = moment()
 
 const syntax = `syntax:
-node ${CONFIG.filenameApp} [--withPdf] [--serverUrl=<url>] [--cached] [--debug] [--help]
+node ${CONFIG.filenameApp} [--withPdf] [--serverUrl=<url>] [--withPrevious] [--cached] [--debug] [--help]
 	--withPdf         : also create PDF (takes a bit longer)
 	--serverUrl=<url> : store serverUrl in output urls
+	--withPrevious    : include details from previous fetch
 	--cached          : return the cached JSON data
 	--debug           : enable debugging (e.g. display browser)
 	--help            : this message 
@@ -80,11 +81,16 @@ function parseOrderResults(scraped) {
 		screenshot:null,
 		pdf:null,
 		calendarTitle:null,
-		previous_label:null, previous_minutesBetweenFromTo:null, 
-		previous_deltaMinutesFrom:null, previous_deltaMinutesTo:null,
-		previous_deltaHuman:null,
-		previous_timestamp:null, previous_humanHowLongAgo:null,
 		// strings: {} 
+	}
+	if (CONFIG.withPrevious) {
+		// merge additional details
+		details = Object.assign(details, {
+			previous_label:null, previous_minutesBetweenFromTo:null, 
+			previous_deltaMinutesFrom:null, previous_deltaMinutesTo:null,
+			previous_deltaHuman:null,
+			previous_timestamp:null, previous_humanHowLongAgo:null,
+		})
 	}
 	let strings = {
 		date:null, from: null, to:null, changeUntil:null
@@ -112,6 +118,9 @@ function parseOrderResults(scraped) {
 
 	now = moment()
 
+	// replace newlines with space
+	scraped.deliveryDetails = scraped.deliveryDetails.replace(/[\r\n]+/g, " ");
+
 	// parse details string, can be 
 	// 1) change details
 	// 2) updated delivery details
@@ -136,6 +145,15 @@ function parseOrderResults(scraped) {
 	if(m && m[2]) {
 		strings.from = m[1]
 		strings.to = m[2]
+	}
+
+	// 'Ontvangen'
+	regex = /Ontvangen/gm;
+	m = regex.exec(scraped.deliveryDetails)
+
+	// in case we want to do something once delivered
+	if(m && m[2]) {
+		// nothing for now
 	}
 
 
@@ -176,7 +194,7 @@ function parseOrderResults(scraped) {
 	}
 	
 	// compare with previous details
-	if (scraped.previousDetails && scraped.previousDetails.orderUrl == details.orderUrl) {
+	if (CONFIG.withPrevious && scraped.previousDetails && scraped.previousDetails.orderUrl == details.orderUrl) {
 		const prevDetails = scraped.previousDetails
 		if (CONFIG.debug) {
 			prevDetails.date_dateFrom = moment(prevDetails.date_dateFrom).subtract(2,'hours').toISOString(true);
@@ -216,17 +234,19 @@ function parseOrderResults(scraped) {
 		return
 	}
 
-	// read the previous details
-	const previousJson = CONFIG.detailsJson ? fs.readFileSync(
-		path.join(CONFIG.outputPath, CONFIG.detailsJson), { encoding: 'utf-8' }
-	) : null;
-	const previousDetails = previousJson ? JSON.parse(previousJson) : null
+	if (CONFIG.withPrevious) {
+		// read the previous details
+		const previousJson = CONFIG.detailsJson ? fs.readFileSync(
+			path.join(CONFIG.outputPath, CONFIG.detailsJson), { encoding: 'utf-8' }
+		) : null;
+		const previousDetails = previousJson ? JSON.parse(previousJson) : null
 
-	// if cached data was requested: display it and exit
-	if (CONFIG.argv.cached && previousDetails) {
-		console.log(JSON.stringify(previousDetails,null,2))
-		return
-	}	
+		// if cached data was requested: display it and exit
+		if (CONFIG.argv.cached && previousDetails) {
+			console.log(JSON.stringify(previousDetails,null,2))
+			return
+		}	
+	}
 
 	// optional settings for Puppeteer
 	let launchSettings = {
@@ -248,7 +268,7 @@ function parseOrderResults(scraped) {
 	await page.waitFor(".login-form");
 	await page.type("#username", CREDS.username);
 	await page.type("#password", CREDS.password);
-	await page.click('.login-form button');
+	await page.click('.login-form .login-form__submit');
 
 	// wait until we get the articles (future and previous orders), or login error
 	await page.waitFor('.login-form__error, article')
@@ -278,7 +298,7 @@ function parseOrderResults(scraped) {
 			orderUrl: await page.$eval(`article div a[href*="${URLORDERS}"]`, el => el.href),
 		}
 		scraped.orderNumber = scraped.orderUrl.split("/").pop();
-		if (previousDetails) scraped.previousDetails = previousDetails
+		if (CONFIG.withPrevious && previousDetails) scraped.previousDetails = previousDetails
 
 		// parse these details
 		const details = parseOrderResults(scraped)
