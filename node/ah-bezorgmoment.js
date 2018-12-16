@@ -122,7 +122,6 @@ function parseOrderResults(scraped) {
 	}
 
 	now = moment()
-	let prefix = '' // prefix to use for label_human
 
 	// replace newlines with space
 	scraped.deliveryDetails = scraped.deliveryDetails.replace(/[\r\n]+/g, " ");
@@ -159,10 +158,8 @@ function parseOrderResults(scraped) {
 	m = regex.exec(scraped.deliveryDetails)
 
 	// in case we want to do something once delivered
-		if(m) {
-		// nothing for now
-		prefix = 'ontvangen: '
-		console.log("ontvangen!")
+	if(m) {
+		details.delivered = true
 	}
 
 
@@ -173,7 +170,7 @@ function parseOrderResults(scraped) {
 	
 	// http://momentjs.com/docs/#/displaying/format/
 	details.label = from.format('dddd D MMMM (H:mm - ') + to.format('H:mm)')
-	details.label_human = prefix + from.format('dddd [tussen] H:mm [en] ') + to.format('H:mm')
+	details.label_human = from.format('dddd [tussen] H:mm [en] ') + to.format('H:mm')
 	details.label_humanUntilDelivery = now.to(to)
 	details.date_dateFrom = from.toISOString(true)
 	details.date_dateTo = to.toISOString(true)
@@ -183,8 +180,6 @@ function parseOrderResults(scraped) {
 	details.minutesBetweenFromTo = from.isValid() && to.isValid() ? to.diff(from,'minutes') : null
 	details.label_weekday = from.format('dddd')
 	details.label_dayAndMonth = from.format('D MMMM')
-
-	// if (prefix || null) details.label_human = prefix + details.label_human
 	
 	// store the remaining details
 	details.timestamp = moment().toISOString(true)

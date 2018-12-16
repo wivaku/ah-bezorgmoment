@@ -24,13 +24,13 @@ if ($err) {
 
 /* option 1: read from the Node output */
 
-// $json = implode("\n", $out);
+$json = implode("\n", $out);
 
 /* option 2: read from the JSON file */
 
-$file = './output/orderDetails.json';
-if (!file_exists($file)) die("could not open $file");
-$json = file_get_contents($file);
+// $file = './output/orderDetails.json';
+// if (!file_exists($file)) die("could not open $file");
+// $json = file_get_contents($file);
 
 
 // return / display the results
