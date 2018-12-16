@@ -159,9 +159,10 @@ function parseOrderResults(scraped) {
 	m = regex.exec(scraped.deliveryDetails)
 
 	// in case we want to do something once delivered
-		if(m && m[2]) {
+		if(m) {
 		// nothing for now
 		prefix = 'ontvangen: '
+		console.log("ontvangen!")
 	}
 
 
