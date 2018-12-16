@@ -12,11 +12,8 @@
   "author": "Winfred van Kuijk",
   "license": "ISC",
   "dependencies": {
-    "cheerio": "^1.0.0-rc.2",
     "minimist": "^1.2.0",
     "moment": "^2.22.2",
     "puppeteer": "^1.7.0",
-    "superagent": "^4.0.0",
-    "superagent-cheerio": "^0.1.1"
   }
 }
