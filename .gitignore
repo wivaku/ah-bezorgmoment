@@ -1,4 +1,8 @@
 node_modules/
 vendor/
 creds.js
+config.js
 old/*
+test*js
+php
+daemon.txt

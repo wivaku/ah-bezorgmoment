@@ -56,7 +56,7 @@ Returns:
     "to": "18:00",
     "changeUntil": "17 augustus 2018, 23:59"
   },
-  "executionSeconds": 3.901
+  "executionSeconds": 0.901
 }
   ```
 
@@ -73,12 +73,21 @@ The following optional output files can be created (see config section).
 $ ./ah-bezorgmoment.js --help
 
 syntax:
-node ah-bezorgmoment.js [--withPdf] [--serverUrl=<url>] [--cached] [--debug] [--help]
+node ah-bezorgmoment.js [--daemon] [--faster] [--withPdf] [--serverUrl=<url>] [--cached] [--debug] [--help]
+	--daemon          : keep the browser running in the background
+	--faster          : don't load CSS, images, fonts (experimental)
 	--withPdf         : also create PDF (takes a bit longer)
 	--serverUrl=<url> : store serverUrl in output urls
 	--cached          : return the cached JSON data
 	--debug           : enable debugging (e.g. display browser)
 	--help            : this message
+```
+
+### daemon mode
+Normally a new browser is launched and stopped every time. It is possible to run the application in the background, so that the browser can be reused. Resulting in much faster responses (less than 1 second instead of ±4 seconds).
+
+```
+$ ./ah-bezorgmoment.js --daemon &
 ```
 
 ### PHP wrapper
@@ -115,15 +124,15 @@ cd node
 npm install
 ```
 
-**note**: Puppeteer also installs Chromium. It is possible to use Puppeteer with custom Chrome/Chromium (`node i puppeteer-core` and specify the path in `launchSettings`), but it needs to be a specific Chrome version so I did not bother.
+**note**: Puppeteer also installs Chromium. It is possible to use Puppeteer with custom Chrome/Chromium (`node i puppeteer-core` and specify the path in `launchSettings`). It worked with Chrome 71 on my Mac, but using the default Chromium is easier.
 
 ### Credentials
 
-**required**: Copy `node/creds_example.js` to `node/creds.js` and enter your Albert Heijn login details.
+**required**: Copy `node/creds_example.js` to `node/creds.js` (is done by `npm install`) and enter your Albert Heijn login details.
 
 ### Config
 
-See Copy `node/config_example.js` to `node/config.js` to enable / disable or customize location and filename. 
+See Copy `node/config_example.js` to `node/config.js` (is done by `npm install`) to enable / disable or customize location and filename. 
 
 ## Author
 

@@ -6,7 +6,7 @@ $cached = (php_sapi_name() !== "cli") && isset($_GET["cached"]); // e.g. http://
 $serverUrl = (php_sapi_name() !== "cli") ? getUrl() : null;
 
 // run the Node application to retrieve the details (stored in ./output/orderDetails.json)
-$cmd = "/usr/local/bin/node ./node/ah-bezorgmoment.js";
+$cmd = "/usr/local/bin/node ./node/ah-bezorgmoment.js --daemon";
 if (isset($withPdf) && $withPdf) $cmd .= " --withPdf";
 if (isset($cached) && $cached) $cmd .= " --cached";
 if (isset($serverUrl) && $serverUrl) $cmd .= " --serverUrl=${serverUrl}";
@@ -24,13 +24,13 @@ if ($err) {
 
 /* option 1: read from the Node output */
 
-$json = implode("\n", $out);
+// $json = implode("\n", $out);
 
 /* option 2: read from the JSON file */
 
-// $file = './output/orderDetails.json';
-// if (!file_exists($file)) die("could not open $file");
-// $json = file_get_contents($file);
+$file = './output/orderDetails.json';
+if (!file_exists($file)) die("could not open $file");
+$json = file_get_contents($file);
 
 
 // return / display the results

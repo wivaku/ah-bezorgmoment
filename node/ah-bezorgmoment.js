@@ -12,6 +12,7 @@ const CREDS = require('./creds');
 
 /** @constant {object} CONFIG user settings (screenshot, JSON file, PDF) */
 const CONFIG = require('./config');
+const DAEMONFILE = './daemon.txt'
 
 /** the various URL's */
 const URLBASE = 'https://www.ah.nl'
@@ -44,7 +45,9 @@ CONFIG.outputUrl = CONFIG.argv.serverUrl ? path.join(CONFIG.argv.serverUrl,CONFI
 CONFIG.executionStart = moment()
 
 const syntax = `syntax:
-node ${CONFIG.filenameApp} [--withPdf] [--serverUrl=<url>] [--withPrevious] [--cached] [--debug] [--help]
+node ${CONFIG.filenameApp} [--daemon] [--withPdf] [--serverUrl=<url>] [--withPrevious] [--cached] [--debug] [--help]
+	--daemon          : keep the browser running in the background
+	--faster          : don't load CSS, images, fonts (experimental)
 	--withPdf         : also create PDF (takes a bit longer)
 	--serverUrl=<url> : store serverUrl in output urls
 	--withPrevious    : include details from previous fetch
@@ -119,6 +122,7 @@ function parseOrderResults(scraped) {
 	}
 
 	now = moment()
+	let prefix = '' // prefix to use for label_human
 
 	// replace newlines with space
 	scraped.deliveryDetails = scraped.deliveryDetails.replace(/[\r\n]+/g, " ");
@@ -126,6 +130,7 @@ function parseOrderResults(scraped) {
 	// parse details string, can be 
 	// 1) change details
 	// 2) updated delivery details
+	// 3) completed orders
 
 	// 'Nog te wijzigen tot vrijdag, 17 augustus 2018, 23:59'
 	regex = /Nog te wijzigen tot (.*?), (.*)/gm;
@@ -154,8 +159,9 @@ function parseOrderResults(scraped) {
 	m = regex.exec(scraped.deliveryDetails)
 
 	// in case we want to do something once delivered
-	if(m && m[2]) {
+		if(m && m[2]) {
 		// nothing for now
+		prefix = 'ontvangen: '
 	}
 
 
@@ -166,7 +172,7 @@ function parseOrderResults(scraped) {
 	
 	// http://momentjs.com/docs/#/displaying/format/
 	details.label = from.format('dddd D MMMM (H:mm - ') + to.format('H:mm)')
-	details.label_human = from.format('dddd [tussen] H:mm [en] ') + to.format('H:mm')
+	details.label_human = prefix + from.format('dddd [tussen] H:mm [en] ') + to.format('H:mm')
 	details.label_humanUntilDelivery = now.to(to)
 	details.date_dateFrom = from.toISOString(true)
 	details.date_dateTo = to.toISOString(true)
@@ -176,6 +182,8 @@ function parseOrderResults(scraped) {
 	details.minutesBetweenFromTo = from.isValid() && to.isValid() ? to.diff(from,'minutes') : null
 	details.label_weekday = from.format('dddd')
 	details.label_dayAndMonth = from.format('D MMMM')
+
+	// if (prefix || null) details.label_human = prefix + details.label_human
 	
 	// store the remaining details
 	details.timestamp = moment().toISOString(true)
@@ -250,41 +258,101 @@ function parseOrderResults(scraped) {
 
 	// optional settings for Puppeteer
 	let launchSettings = {
-		// executablePath: '/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome', // your mileage may vary
+		// executablePath: '/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome', // your mileage may vary, preferred to use Chromium included with Puppeteer
 		// args: [ '--disable-extensions' ],
 		// devtools: true, // shows browser + devtools
 		// headless: false, // shows browser
 	}
 	if (CONFIG.debug) launchSettings.devtools = true
 
-	const browser = await puppeteer.launch(launchSettings);
-
-	// login
-	// const page = await browser.newPage();
-	const pages = await browser.pages()
-	const page = pages.length ? pages[0] : await browser.newPage()
-	await page.goto(`${URLBASE}${URLLOGIN}?ref=${URLORDERS}`).catch(e => console.error(e));
-
-	await page.waitFor(".login-form");
-	await page.type("#username", CREDS.username);
-	await page.type("#password", CREDS.password);
-	await page.click('.login-form .login-form__submit');
-
-	// wait until we get the articles (future and previous orders), or login error
-	await page.waitFor('.login-form__error, article')
-
-	// store as screenshot
-	if (CONFIG.screenshot) {
-		await page.screenshot({path: path.join(CONFIG.outputPath, CONFIG.screenshot), fullPage: false});
+	// either connect to existing browser (daemon mode), or launch new one
+	let browser
+	let usingExistingEndpoint
+	try {
+		wsEndpoint = fs.readFileSync(DAEMONFILE, 'utf-8')
+		console.log("found daemon file: ", DAEMONFILE)
+		browser = await puppeteer.connect({browserWSEndpoint: wsEndpoint})
+		console.log("connected to existing browser: ", wsEndpoint)
+		usingExistingEndpoint = wsEndpoint
+	} catch (err) {
+		console.log("launching new browser")
+		browser = await puppeteer.launch(launchSettings)
+		if (CONFIG.argv.daemon && browser.wsEndpoint()) {
+			fs.writeFileSync( DAEMONFILE, browser.wsEndpoint() )
+			console.log(`written details existing browser to: ${DAEMONFILE}`)
+		} else {
+			// connecting to existing endpoint failed, and daemon option was not used: we can remove existing daemon file
+			try {
+				fs.unlinkSync(DAEMONFILE)
+			} catch(err) {
+			}
+		}
 	}
 
-	// check if the login failed: get the error message on the screen
+	// use existing page, or create new one if none exists
+	const pages = await browser.pages()
+	const page = pages.length ? pages[0] : await browser.newPage()
+
+	// disable loading images and stylesheets
+	if (CONFIG.argv.faster) {
+		await page.setRequestInterception(true);
+		page.on('request', (request) => {
+			if (['image', 'stylesheet', 'font'].indexOf(request.resourceType()) !== -1) {
+				request.abort();
+			} else {
+				request.continue();
+			}
+		});
+	}
+
+	// load the order page (could be we get a login page)
+	try {
+		await page.goto(`${URLBASE}${URLORDERS}`).catch(e => console.error(e));
+	} catch (e) {
+		if (e instanceof TimeoutError) {
+		  // Do something if this is a timeout.
+		  console.log('page timeout')
+		}
+	}
+
+	// wait for the various elements that we can encounter
+	await page.waitFor(".status500, #password, .login-form, .login-form__error, article");
+
+	// - .status500: site is in maintenance mode
+	// - #password, .login-form: login form elements
+	// - .login-form__error: element that appears after unsuccesful login
+	// - article: the order page
+
+	// check for + deal with site maintenance
+	const siteMaintenanceMode = await page.$eval('.status500', e => e.innerText).catch(e => { return });
+	if (siteMaintenanceMode) {
+		throw "AH site is in maintenance mode"
+	}
+
+	// check for + deal with login page
+	const loginForm = await page.$eval('#password', e => e.outerHTML).catch(e => { return });
+	if (loginForm) {
+		await page.waitFor(200)
+
+		await page.type("#username", CREDS.username);
+		await page.type("#password", CREDS.password);
+		await page.click('.login-form .login-form__submit');
+
+		// wait until we get the articles (future and previous orders), or login error
+		await page.waitFor(".login-form__error, article");
+	}
+
+	// store as screenshot
+	if (CONFIG.screenshot && !CONFIG.argv.faster) {
+		await page.screenshot({path: path.join(CONFIG.outputPath, CONFIG.screenshot), fullPage: false});
+		console.log(`created screenshot: ${CONFIG.screenshot}`)
+	}
+
+	// check if the login failed: show the error message that was on the screen
 	const errorMsg = await page.$eval('.login-form__error', el => el.innerText).catch(e => { return });
 	if (errorMsg) {
-		console.error(errorMsg)
 		console.log('creds.js username: '+CREDS.username)
-		await browser.close();
-		return
+		throw errorMsg
 	}
 
 	// check if there are open orders
@@ -331,15 +399,27 @@ function parseOrderResults(scraped) {
 				format: 'A4'
 			});
 		}	  
+	} else {
+		console.log('no open orders')
 	}
 
 	// we're done
 	if (CONFIG.debug) {
 		console.log('')
 		console.log('Done. Press Ctrl-c to quit')
+		await browser.disconnect()
 	} else {
-		await browser.close();
-	}
+		if (usingExistingEndpoint || CONFIG.argv.daemon) {
+			console.log(`disconnecting from browser, to reconnect use endpoint in ${DAEMONFILE}`)
+			await browser.disconnect()
+		} else {
+			console.log('closing browser')
+			await browser.close()
+		}
+	}		
 
-  })();
-  
+  })()
+  .catch(e => {
+	  console.log("error:", e)
+	  process.exit()
+  });
