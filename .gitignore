@@ -6,3 +6,4 @@ old/*
 test*js
 php
 daemon.txt
+launch.json

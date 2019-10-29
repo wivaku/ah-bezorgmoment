@@ -33,15 +33,15 @@ CONFIG.argv = require('minimist')(process.argv.slice(2));
 if (!CONFIG.debug && CONFIG.argv.debug) CONFIG.debug = true
 
 // set the name of this file
-CONFIG.filenameApp = path.posix.basename( process.argv[1] );
+CONFIG.filenameApp = path.posix.basename(process.argv[1]);
 // set the path to the app, output folder and if applicable output URL
-CONFIG.pathToApp = path.posix.dirname( process.argv[1] );
-CONFIG.outputPath = path.join( 
+CONFIG.pathToApp = path.posix.dirname(process.argv[1]);
+CONFIG.outputPath = path.join(
 	CONFIG.pathToApp,
 	CONFIG.outputPathRelative,
 	CONFIG.outputFolder
 )
-CONFIG.outputUrl = CONFIG.argv.serverUrl ? path.join(CONFIG.argv.serverUrl,CONFIG.outputFolder) : null
+CONFIG.outputUrl = CONFIG.argv.serverUrl ? path.join(CONFIG.argv.serverUrl, CONFIG.outputFolder) : null
 CONFIG.executionStart = moment()
 
 const syntax = `syntax:
@@ -56,7 +56,7 @@ node ${CONFIG.filenameApp} [--daemon] [--withPdf] [--serverUrl=<url>] [--withPre
 	--help            : this message 
 `
 
-if(CONFIG.argv.help) {
+if (CONFIG.argv.help) {
 	console.log(syntax)
 	if (CONFIG.debug) console.log(CONFIG)
 	return
@@ -72,40 +72,40 @@ if(CONFIG.argv.help) {
  */
 function parseOrderResults(scraped) {
 	// e.g. iOS Shortcuts Dictionary can not handle nested object, so make as flat as possible
-	let details = { 
-		label:null, label_human:null, label_humanUntilDelivery:null, label_humanChangeUntil:null,
-		date_ymd:null, time_from:null, time_to:null, minutesBetweenFromTo:null,
-		label_weekday:null, label_dayAndMonth:null,
-		date_dateFrom:null, date_dateTo:null, date_dateChangeUntil:null, 
-		timestamp:null,
-		address:null, 
-		orderUrl:null,
-		json:null,
-		screenshot:null,
-		pdf:null,
-		calendarTitle:null,
+	let details = {
+		label: null, label_human: null, label_humanUntilDelivery: null, label_humanChangeUntil: null,
+		date_ymd: null, time_from: null, time_to: null, minutesBetweenFromTo: null,
+		label_weekday: null, label_dayAndMonth: null,
+		date_dateFrom: null, date_dateTo: null, date_dateChangeUntil: null,
+		timestamp: null,
+		address: null,
+		orderUrl: null,
+		json: null,
+		screenshot: null,
+		pdf: null,
+		calendarTitle: null,
 		// strings: {} 
 	}
 
 	if (CONFIG.argv.withPrevious) {
 		// merge additional details
 		details = Object.assign(details, {
-			previous_label:null, previous_minutesBetweenFromTo:null, 
-			previous_deltaMinutesFrom:null, previous_deltaMinutesTo:null,
-			previous_deltaHuman:null,
-			previous_timestamp:null, previous_humanHowLongAgo:null,
+			previous_label: null, previous_minutesBetweenFromTo: null,
+			previous_deltaMinutesFrom: null, previous_deltaMinutesTo: null,
+			previous_deltaHuman: null,
+			previous_timestamp: null, previous_humanHowLongAgo: null,
 		})
 	}
 
 	let strings = {
-		date:null, from: null, to:null, changeUntil:null
+		date: null, from: null, to: null, changeUntil: null
 	}
 
 	// parse deliverySummary string
 	regex = /(.*20\d\d).(\d{2}:\d{2}) - (\d{2}:\d{2}), (.*)/gm;
 	// 'Zaterdag 18 aug. 2018 16:00 - 18:00, My street 1234, City'
 	m = regex.exec(scraped.deliverySummary)
-	
+
 	if (m && m[1]) {
 		strings.date = m[1]
 		strings.from = m[2]
@@ -116,7 +116,7 @@ function parseOrderResults(scraped) {
 	// during debug, replace actual data with dummy data
 	if (CONFIG.debug) {
 		const dummyAddress = 'My address 1234, My city'
-		scraped.deliverySummary = scraped.deliverySummary.replace(details.address,dummyAddress)		
+		scraped.deliverySummary = scraped.deliverySummary.replace(details.address, dummyAddress)
 		details.address = dummyAddress
 		scraped.orderUrl = scraped.orderUrl.replace(/\d+/gm, '123456789')
 	}
@@ -134,21 +134,21 @@ function parseOrderResults(scraped) {
 	// 'Nog te wijzigen tot vrijdag, 17 augustus 2018, 23:59'
 	regex = /Nog te wijzigen tot (.*?), (.*)/gm;
 	m = regex.exec(scraped.deliveryDetails)
-	
-	if(m && m[2]) {
+
+	if (m && m[2]) {
 		strings.changeUntil = m[2]
 		changeUntil = moment(strings.changeUntil, "DD MMMM YYYY, HH:mm")
 
 		details.date_dateChangeUntil = changeUntil.toISOString(true)
-		details.label_humanChangeUntil = now.to(changeUntil)	
+		details.label_humanChangeUntil = now.to(changeUntil)
 	}
-	
+
 	// 'Je bezorging staat gepland tussen 16:15 en 16:45. Deze tijd kan nog wijzigen'
 	regex = /Je bezorging staat gepland tussen (\d+:\d+) en (\d+:\d+).*/gm;
 	m = regex.exec(scraped.deliveryDetails)
 
 	// we now have more precise times
-	if(m && m[2]) {
+	if (m && m[2]) {
 		strings.from = m[1]
 		strings.to = m[2]
 	}
@@ -158,16 +158,16 @@ function parseOrderResults(scraped) {
 	m = regex.exec(scraped.deliveryDetails)
 
 	// in case we want to do something once delivered
-	if(m) {
+	if (m) {
 		details.delivered = true
 	}
 
 
 	// parse the various strings
 	moment.locale('nl')
-	from = moment(strings.date +" "+ strings.from, "dddd DD MMM. YYYY HH:mm")
-	to = moment(strings.date +" "+ strings.to, "dddd DD MMM. YYYY HH:mm")
-	
+	from = moment(strings.date + " " + strings.from, "dddd DD MMM. YYYY HH:mm")
+	to = moment(strings.date + " " + strings.to, "dddd DD MMM. YYYY HH:mm")
+
 	// http://momentjs.com/docs/#/displaying/format/
 	details.label = from.format('dddd D MMMM (H:mm - ') + to.format('H:mm)')
 	details.label_human = from.format('dddd [tussen] H:mm [en] ') + to.format('H:mm')
@@ -177,13 +177,13 @@ function parseOrderResults(scraped) {
 	details.date_ymd = from.format('YYYY-MM-DD')
 	details.time_from = from.format('H:mm')
 	details.time_to = to.format('H:mm')
-	details.minutesBetweenFromTo = from.isValid() && to.isValid() ? to.diff(from,'minutes') : null
+	details.minutesBetweenFromTo = from.isValid() && to.isValid() ? to.diff(from, 'minutes') : null
 	details.label_weekday = from.format('dddd')
 	details.label_dayAndMonth = from.format('D MMMM')
-	
+
 	// store the remaining details
 	details.timestamp = moment().toISOString(true)
-	details.source = {deliverySummary:scraped.deliverySummary, deliveryDetails:scraped.deliveryDetails}
+	details.source = { deliverySummary: scraped.deliverySummary, deliveryDetails: scraped.deliveryDetails }
 	details.strings = strings
 
 	details.orderUrl = scraped.orderUrl
@@ -191,20 +191,20 @@ function parseOrderResults(scraped) {
 	details.json = CONFIG.detailsJson || null
 	details.screenshot = CONFIG.screenshot || null
 	details.pdf = CONFIG.argv.withPdf ? CONFIG.orderPdf || null : null
-	
+
 	// if server URL was provided, then prefix the output URL
 	if (CONFIG.outputUrl) {
-		if (details.json) details.json = CONFIG.outputUrl +'/'+ details.json
-		if (details.screenshot) details.screenshot = CONFIG.outputUrl +'/'+ details.screenshot
-		if (details.pdf) details.pdf = CONFIG.outputUrl +'/'+ details.pdf
+		if (details.json) details.json = CONFIG.outputUrl + '/' + details.json
+		if (details.screenshot) details.screenshot = CONFIG.outputUrl + '/' + details.screenshot
+		if (details.pdf) details.pdf = CONFIG.outputUrl + '/' + details.pdf
 	}
-	
+
 	// compare with previous details
 	if (CONFIG.argv.withPrevious && scraped.previousDetails && scraped.previousDetails.orderUrl == details.orderUrl) {
 		const prevDetails = scraped.previousDetails
 		if (CONFIG.debug) {
-			prevDetails.date_dateFrom = moment(prevDetails.date_dateFrom).subtract(2,'hours').toISOString(true);
-			prevDetails.date_dateTo = moment(prevDetails.date_dateTo).add(1,'hours').toISOString(true);
+			prevDetails.date_dateFrom = moment(prevDetails.date_dateFrom).subtract(2, 'hours').toISOString(true);
+			prevDetails.date_dateTo = moment(prevDetails.date_dateTo).add(1, 'hours').toISOString(true);
 		}
 		prevFrom = moment(prevDetails.date_dateFrom)
 		prevTo = moment(prevDetails.date_dateTo)
@@ -248,9 +248,9 @@ function parseOrderResults(scraped) {
 
 	// if cached data was requested: display it and exit
 	if (CONFIG.argv.cached && previousDetails) {
-		console.log(JSON.stringify(previousDetails,null,2))
+		console.log(JSON.stringify(previousDetails, null, 2))
 		return
-	}	
+	}
 
 	// optional settings for Puppeteer
 	let launchSettings = {
@@ -267,20 +267,20 @@ function parseOrderResults(scraped) {
 	try {
 		wsEndpoint = fs.readFileSync(DAEMONFILE, 'utf-8')
 		console.log("found daemon file: ", DAEMONFILE)
-		browser = await puppeteer.connect({browserWSEndpoint: wsEndpoint})
+		browser = await puppeteer.connect({ browserWSEndpoint: wsEndpoint })
 		console.log("connected to existing browser: ", wsEndpoint)
 		usingExistingEndpoint = wsEndpoint
 	} catch (err) {
 		console.log("launching new browser")
 		browser = await puppeteer.launch(launchSettings)
 		if (CONFIG.argv.daemon && browser.wsEndpoint()) {
-			fs.writeFileSync( DAEMONFILE, browser.wsEndpoint() )
+			fs.writeFileSync(DAEMONFILE, browser.wsEndpoint())
 			console.log(`written details existing browser to: ${DAEMONFILE}`)
 		} else {
 			// connecting to existing endpoint failed, and daemon option was not used: we can remove existing daemon file
 			try {
 				fs.unlinkSync(DAEMONFILE)
-			} catch(err) {
+			} catch (err) {
 			}
 		}
 	}
@@ -306,8 +306,8 @@ function parseOrderResults(scraped) {
 		await page.goto(`${URLBASE}${URLORDERS}`).catch(e => console.error(e));
 	} catch (e) {
 		if (e instanceof TimeoutError) {
-		  // Do something if this is a timeout.
-		  console.log('page timeout')
+			// Do something if this is a timeout.
+			console.log('page timeout')
 		}
 	}
 
@@ -340,14 +340,14 @@ function parseOrderResults(scraped) {
 
 	// store as screenshot
 	if (CONFIG.screenshot && !CONFIG.argv.faster) {
-		await page.screenshot({path: path.join(CONFIG.outputPath, CONFIG.screenshot), fullPage: false});
+		await page.screenshot({ path: path.join(CONFIG.outputPath, CONFIG.screenshot), fullPage: false });
 		console.log(`created screenshot: ${CONFIG.screenshot}`)
 	}
 
 	// check if the login failed: show the error message that was on the screen
 	const errorMsg = await page.$eval('.login-form__error', el => el.innerText).catch(e => { return });
 	if (errorMsg) {
-		console.log('creds.js username: '+CREDS.username)
+		console.log('creds.js username: ' + CREDS.username)
 		throw errorMsg
 	}
 
@@ -372,29 +372,29 @@ function parseOrderResults(scraped) {
 			details.executionSeconds = moment().diff(CONFIG.executionStart, 'seconds', true)
 
 			fs.writeFileSync(
-				path.join(CONFIG.outputPath, CONFIG.detailsJson), 
+				path.join(CONFIG.outputPath, CONFIG.detailsJson),
 				JSON.stringify(details, null, 2),
 				{ encoding: 'utf-8' }
-			); 
+			);
 		}
 		// display the details object
-		console.log(JSON.stringify(details,null,2))
+		console.log(JSON.stringify(details, null, 2))
 
 		// create PDF of the order (only if asked for in command line argument)
 		// will fail if not headless (e.g. devtools)
 		if (CONFIG.argv.withPdf && CONFIG.orderPdf) {
 			const pagePdf = await browser.newPage();
-			await pagePdf.goto(`${URLBASE}${URLORDERDETAILS}${scraped.orderNumber}`, {waitUntil: 'networkidle2'});
+			await pagePdf.goto(`${URLBASE}${URLORDERDETAILS}${scraped.orderNumber}`, { waitUntil: 'networkidle2' });
 
 			// remove the background color
-			pagePdf.addStyleTag({content:'body { background-color: transparent !important }'})
+			pagePdf.addStyleTag({ content: 'body { background-color: transparent !important }' })
 
 			// create the PDF file (unless we are in debug mode, only possible headless)
 			if (!CONFIG.debug) await pagePdf.pdf({
-				path: path.join(CONFIG.outputPath, CONFIG.orderPdf), 
+				path: path.join(CONFIG.outputPath, CONFIG.orderPdf),
 				format: 'A4'
 			});
-		}	  
+		}
 	} else {
 		console.log('no open orders')
 	}
@@ -412,10 +412,10 @@ function parseOrderResults(scraped) {
 			console.log('closing browser')
 			await browser.close()
 		}
-	}		
+	}
 
-  })()
-  .catch(e => {
-	  console.log("error:", e)
-	  process.exit()
-  });
+})()
+	.catch(e => {
+		console.log("error:", e)
+		process.exit()
+	});

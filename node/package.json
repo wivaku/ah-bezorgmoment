@@ -12,8 +12,8 @@
   "author": "Winfred van Kuijk",
   "license": "ISC",
   "dependencies": {
-    "minimist": "^1.2.0",
-    "moment": "^2.22.2",
-    "puppeteer": "^1.7.0"
+    "minimist": ">=1.2.0",
+    "moment": ">=2.24",
+    "puppeteer": "^2.0.0"
   }
 }
