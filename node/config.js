@@ -4,7 +4,7 @@ module.exports = {
 	 * feel free to change / comment out the below
 	 */
 
-	 // where to store the output files?
+	// where to store the output files?
 	outputPathRelative: '..', // relative path from location of Node application
 	outputFolder: '/output', // name of folder (as it would be accessed from webserver)
 

@@ -254,6 +254,7 @@ function parseOrderResults(scraped) {
 
 	// optional settings for Puppeteer
 	let launchSettings = {
+		userDataDir: `/var/tmp/${CONFIG.filenameApp}`, // https://chromium.googlesource.com/chromium/src/+/master/docs/user_data_dir.md
 		// executablePath: '/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome', // your mileage may vary, preferred to use Chromium included with Puppeteer
 		// args: [ '--disable-extensions' ],
 		// devtools: true, // shows browser + devtools
@@ -289,6 +290,9 @@ function parseOrderResults(scraped) {
 	const pages = await browser.pages()
 	const page = pages.length ? pages[0] : await browser.newPage()
 
+	// change timeout - default timeout is 30 seconds (30x1000)
+	page.setDefaultTimeout(3000);
+
 	// disable loading images and stylesheets
 	if (CONFIG.argv.faster) {
 		await page.setRequestInterception(true);
@@ -312,9 +316,10 @@ function parseOrderResults(scraped) {
 	}
 
 	// wait for the various elements that we can encounter
-	await page.waitFor(".status500, #password, .login-form, .login-form__error, article");
+	await page.waitFor(".status500, #decline-cookies, #password, .login-form__submit, .login-form__error, article");
 
 	// - .status500: site is in maintenance mode
+	// - #decline-cookies: cookiewall
 	// - #password, .login-form: login form elements
 	// - .login-form__error: element that appears after unsuccesful login
 	// - article: the order page
@@ -325,17 +330,34 @@ function parseOrderResults(scraped) {
 		throw "AH site is in maintenance mode"
 	}
 
+	// await page.waitForNavigation({ waitUntil: 'networkidle0' }); // wait for page to be loaded completely
+
+	const cookieWall = await page.$eval('#decline-cookies', e => e.innerText).catch(e => { return });
+	if (cookieWall) {
+		await page.click('#decline-cookies');
+		console.log('declined the cookies');
+	}
+
 	// check for + deal with login page
 	const loginForm = await page.$eval('#password', e => e.outerHTML).catch(e => { return });
 	if (loginForm) {
-		await page.waitFor(200)
+		// await page.waitFor(300)
 
 		await page.type("#username", CREDS.username);
-		await page.type("#password", CREDS.password);
-		await page.click('.login-form .login-form__submit');
+		await page.type("#password", CREDS.password);		
+		await page.click('.login-form__submit');
 
-		// wait until we get the articles (future and previous orders), or login error
-		await page.waitFor(".login-form__error, article");
+		// wait until we get either of these two: the articles (future and previous orders), or login error
+
+		try {
+			await page.waitFor(".login-form__error, #rc-imageselect, #recaptcha-verify-button, article");
+		} catch(e) {
+			// note: sometimes recaptcha is shown, but the orde page will still be loaded
+			const foundRecaptcha = await page.$eval('#recaptcha-verify-button', el => el.innerText).catch(e => { return });
+			var resultError = foundRecaptcha ? "encountered recaptcha" : "error after pressing submit"
+			console.log(resultError)
+			console.log(e)
+		}
 	}
 
 	// store as screenshot
@@ -347,8 +369,13 @@ function parseOrderResults(scraped) {
 	// check if the login failed: show the error message that was on the screen
 	const errorMsg = await page.$eval('.login-form__error', el => el.innerText).catch(e => { return });
 	if (errorMsg) {
+		var resultError = "error logging in"
 		console.log('creds.js username: ' + CREDS.username)
 		throw errorMsg
+	}
+
+	if (resultError) {
+		var details = { error: resultError }
 	}
 
 	// check if there are open orders
@@ -365,38 +392,39 @@ function parseOrderResults(scraped) {
 		if (CONFIG.argv.withPrevious && previousDetails) scraped.previousDetails = previousDetails
 
 		// parse these details
-		const details = parseOrderResults(scraped)
+		var details = parseOrderResults(scraped)
+	} else if (!resultError) {
+		console.log('no open orders')
+	}
 
-		if (CONFIG.detailsJson) {
-			// store how long it took to execute
-			details.executionSeconds = moment().diff(CONFIG.executionStart, 'seconds', true)
+	// write the results (can contain order details or error)
+	if (details && CONFIG.detailsJson) {
+		// store how long it took to execute
+		details.executionSeconds = moment().diff(CONFIG.executionStart, 'seconds', true)
 
-			fs.writeFileSync(
-				path.join(CONFIG.outputPath, CONFIG.detailsJson),
-				JSON.stringify(details, null, 2),
-				{ encoding: 'utf-8' }
-			);
-		}
+		fs.writeFileSync(
+			path.join(CONFIG.outputPath, CONFIG.detailsJson),
+			JSON.stringify(details, null, 2),
+			{ encoding: 'utf-8' }
+		);
 		// display the details object
 		console.log(JSON.stringify(details, null, 2))
+	}
 
-		// create PDF of the order (only if asked for in command line argument)
-		// will fail if not headless (e.g. devtools)
-		if (CONFIG.argv.withPdf && CONFIG.orderPdf) {
-			const pagePdf = await browser.newPage();
-			await pagePdf.goto(`${URLBASE}${URLORDERDETAILS}${scraped.orderNumber}`, { waitUntil: 'networkidle2' });
+	// create PDF of the order (only if asked for in command line argument)
+	// will fail if not headless (e.g. devtools)
+	if (openOrders.length && CONFIG.argv.withPdf && CONFIG.orderPdf) {
+		const pagePdf = await browser.newPage();
+		await pagePdf.goto(`${URLBASE}${URLORDERDETAILS}${scraped.orderNumber}`, { waitUntil: 'networkidle2' });
 
-			// remove the background color
-			pagePdf.addStyleTag({ content: 'body { background-color: transparent !important }' })
+		// remove the background color
+		pagePdf.addStyleTag({ content: 'body { background-color: transparent !important }' })
 
-			// create the PDF file (unless we are in debug mode, only possible headless)
-			if (!CONFIG.debug) await pagePdf.pdf({
-				path: path.join(CONFIG.outputPath, CONFIG.orderPdf),
-				format: 'A4'
-			});
-		}
-	} else {
-		console.log('no open orders')
+		// create the PDF file (unless we are in debug mode, only possible headless)
+		if (!CONFIG.debug) await pagePdf.pdf({
+			path: path.join(CONFIG.outputPath, CONFIG.orderPdf),
+			format: 'A4'
+		});
 	}
 
 	// we're done
