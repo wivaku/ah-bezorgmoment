@@ -101,6 +101,8 @@ function parseOrderResults(scraped) {
 		date: null, from: null, to: null, changeUntil: null
 	}
 
+	moment.locale(CONFIG.locale || 'nl')
+
 	// parse deliverySummary string
 	regex = /(.*20\d\d).(\d{2}:\d{2}) - (\d{2}:\d{2}), (.*)/gm;
 	// 'Zaterdag 18 aug. 2018 16:00 - 18:00, My street 1234, City'
@@ -121,8 +123,6 @@ function parseOrderResults(scraped) {
 		scraped.orderUrl = scraped.orderUrl.replace(/\d+/gm, '123456789')
 	}
 
-	now = moment()
-
 	// replace newlines with space
 	scraped.deliveryDetails = scraped.deliveryDetails.replace(/[\r\n]+/g, " ");
 
@@ -140,7 +140,7 @@ function parseOrderResults(scraped) {
 		changeUntil = moment(strings.changeUntil, "DD MMMM YYYY, HH:mm")
 
 		details.date_dateChangeUntil = changeUntil.toISOString(true)
-		details.label_humanChangeUntil = now.to(changeUntil)
+		details.label_humanChangeUntil = changeUntil.fromNow()
 	}
 
 	// 'Je bezorging staat gepland tussen 16:15 en 16:45. Deze tijd kan nog wijzigen'
@@ -164,14 +164,13 @@ function parseOrderResults(scraped) {
 
 
 	// parse the various strings
-	moment.locale('nl')
 	from = moment(strings.date + " " + strings.from, "dddd DD MMM. YYYY HH:mm")
 	to = moment(strings.date + " " + strings.to, "dddd DD MMM. YYYY HH:mm")
 
 	// http://momentjs.com/docs/#/displaying/format/
 	details.label = from.format('dddd D MMMM (H:mm - ') + to.format('H:mm)')
 	details.label_human = from.format('dddd [tussen] H:mm [en] ') + to.format('H:mm')
-	details.label_humanUntilDelivery = now.to(to)
+	details.label_humanUntilDelivery = to.fromNow()
 	details.date_dateFrom = from.toISOString(true)
 	details.date_dateTo = to.toISOString(true)
 	details.date_ymd = from.format('YYYY-MM-DD')
@@ -371,7 +370,7 @@ function parseOrderResults(scraped) {
 	if (errorMsg) {
 		var resultError = "error logging in"
 		console.log('creds.js username: ' + CREDS.username)
-		throw errorMsg
+		// throw errorMsg
 	}
 
 	if (resultError) {
